@@ -1,0 +1,210 @@
+---
+title: "Effects of Health Indicators on Economic Output"
+author: "TheStatian"
+date: "12/3/2015"
+output: ioslides_presentation
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(GGally)
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+dataset <- read.csv("WHO.csv", stringsAsFactors = FALSE, na.strings = c(NA, NULL))
+```
+
+#Research Question
+##Research Question
+
+What are the correlations between economic status of countries and the health indicators of countries? And how are they correlated?
+
+# Our Dataset
+## Our Dataset
+
+- Took data from the World Health Organization (WHO)
+- Includes social, economic, health, and political variables
+- Used GNI (Gross National Income) per capita
+    - GNI = GDP + income earned by citizens in foreign economy - income earned by foreigners in domestic economy
+    - GNI more applicable because it focuses on solely domestic factors
+    - per capita takes population into account
+    
+# World Differences in Economic Growth
+## GNI Classifications
+
+- Low income: $1,035 or less
+- Lower middle income: $1,036 to $4,085
+- Upper middle income: $4,086 to $12,615
+- High income: $12,616 or more
+
+```{r echo=FALSE}
+dataset$income_group <- cut(dataset$GNI_per_capita, 
+                       breaks = c(-Inf, 1035, 4085, 12615, Inf), 
+                       labels = c("LOW INCOME", "LOWER MIDDLE INCOME", "UPPER MIDDLE INCOME", "HIGH INCOME"), 
+                       right = FALSE)
+
+```
+
+```{r echo=FALSE}
+dataset %>%
+  group_by(income_group) %>%
+  summarise(count = n())
+```
+
+## GNI Classifications
+
+```{r echo=FALSE}
+incomeplot <- ggplot(dataset, aes(x = income_group)) + 
+  geom_histogram()
+incomeplot + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Graphing the Impacts on Economic Status
+## Avoiding Colinearity
+
+- split variables into five sections
+    - Government Expenditure on Health
+    - Preventative Treatment
+    - Quality of Child Health Treatment
+    - Disease and Disease Mortality Rates
+    - Density of Health Workers
+- Variables likely to be colinear within each group, but less so between each one
+- Used the variable with the highest $R^2$ value to construct full model
+
+## Government Expenditure on Health
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data = dataset, aes(x = GNI_per_capita, y = Per_capita_government_expenditure_on_health)) +
+  geom_point(position = "jitter") +
+  stat_smooth(method = "lm")
+```
+
+## Government Expenditure on Health
+
+$\widehat{GNIpercapita} = 4224.34 + 12.60\widehat{PerCapitaGovernmentExpenditureOnHealth}$
+
+- A nation whose government spends nothing on health would be expected to have a GNI of 4224.34 (Upper Middle Income).
+- Each increase in 1 of per-capita government health expenditure would increease GNI by 12.60
+    - GNI includes overall government expenditure, so this makes sense with the definition of the variable
+
+## Preventative Treatment
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data = dataset, aes(x = GNI_per_capita, y = Women_who_have_had_mammography)) +
+  geom_point(position = "jitter") +
+  stat_smooth(method = "lm")
+```
+
+## Preventative Treatment
+
+$\widehat{GNIpercapita} = 3386.05 + 407.86\widehat{WomenWhoHaveHadMammography}$
+
+- A country where no women have had mammographies would be expected to have a GNI of 3386.05 (Lower Middle Income)
+- An increase of 1 in the percentage of women who have had mammographies would increase the GNI by 407.86
+    - increased health expenditure due to treatment costs
+
+## Quality of Child Health Treatment
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data = dataset, aes(x = GNI_per_capita, y = Infant_mortality_rate_per_1000_live_births_both_sexes)) +
+  geom_point(position = "jitter") +
+  stat_smooth(method = "lm")
+```
+
+## Quality of Child Health Treatment
+
+$\widehat{GNIpercapita} = -41501.61 +$ $783.99\widehat{InfantMortalityRatePer1000LiveBirthsBothSexes}$
+
+- Infant mortality is positively correlated with GNI
+- A country with a 0 infant mortality rate would have a GNI of -41501.61
+    - unrealistic, but this would classify the country as Low Income
+- Countries with higher infant mortality rates likely spend more on healthcare to mitigate the effects
+    - would raise GNI due to increased government expenditure
+- Infant deaths may be linked towards the poorer areas in countries with high GNI and high income inequality
+
+## Disease and Disease Mortality Rates
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data = dataset, aes(x = GNI_per_capita, y = Colon_and_Rectum_cancer_new_cases_per_100_000_women)) +
+  geom_point(position = "jitter")+
+  stat_smooth(method = "lm")
+```
+
+## Disease and Mortality Rates
+
+$\widehat{GNIpercapita} = -467.96 +$ $1005.17\widehat{ColonAndRectumCancerNewCasesPer100000Women}$
+
+- With 0 Colon and Rectal Cancer Cases, we would expect GNI to be -467.96. However, a country would not realistically have a negative GNI.
+- Increased Colon and Rectal Cancer Case rates likely increase the amount of both expenditure to cure the disease and aleviate present symptoms
+    - A larger rate would increase GNI by increasing the amount of money used to combat the disease (positive correlation) 
+
+## Density of Health Workers
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data = dataset, aes(x = GNI_per_capita, y = Nursing_and_midwifery_personnel_density_per_10000_population)) +
+  geom_point(position = "jitter") +
+  stat_smooth(method = "lm")
+```
+
+## Density of Health Workers
+
+$\widehat{GNIpercapita} = 1837.37 +$ $251.19\widehat{NursingAndMidwiferyPersonnelDensityPer10000Population}$
+
+- A country with 0 nurses or midwives would be expected to have a GNI of 1837.37 (Low Income)
+- Each increase in 1 unit of density would increase the GNI by 251.19
+    - would increase the flow of money due to the increased workforce, adding to the consumption and overall income
+    
+
+# Constructing a Full Model
+## Constructing a Full Model
+
+- Each variable explains the variance best within each cohort, but not necessarily overall
+```{r echo=FALSE, message=FALSE}
+full_model_gni_health <- lm(GNI_per_capita ~ Per_capita_government_expenditure_on_health + Women_who_have_had_mammography + Infant_mortality_rate_per_1000_live_births_both_sexes + Colon_and_Rectum_cancer_new_cases_per_100_000_women + Nursing_and_midwifery_personnel_density_per_10000_population, data = dataset)
+```
+
+```{r}
+full_model_gni_health$call
+AIC(full_model_gni_health)
+```
+
+## Constructing a Full Model
+```{r echo=FALSE, message=FALSE, error=FALSE}
+final_model_gni_health <- step(full_model_gni_health, direction = "forward")
+```
+
+```{r}
+AIC(final_model_gni_health)
+```
+
+## Constructing a Full Model
+
+- Since the AIC did not change as a result of forward selection, the full model with all 5 variables explains the variance best
+
+$\widehat{GNIpercapita} = -11444.022 +$ $10.017\widehat{PerCapitaGovernmentExpenditureOnHealth} -$ $3.457\widehat{WomenWhoHaveHadMammography} +$ $230.872\widehat{InfantMortalityRatePer1000LiveBirthsBothSexes} -$ $23.755\widehat{ColonAndRectumCancerNewCasesPer100000Women} +$ $35.033\widehat{NursingAndMidwiferyPersonnelDensityPer10000Population}$
+
+- a country essentially must have some expenditure on overall health, or else its GNI per capita would likely be -11444.022
+
+# Implications
+## Implications
+
+- Government should increase expenditure on health due to the positive correlation between government healthe expenditure and GNI
+    - expenditure should be equitable to overall population
+- Variables considered only affect economic growth, yet their implications are more complex
+    - social factors like HIV prevalence, infant mortality, and other cancer rates would have effects on policy making
+    - governments may not have the available capital or ability to borrow to increase spending on health
+
+
+# Limitations and further explorations
+## Limitations and further explorations
+
+- Further studies could explore the percentage of the population below poverty line and household income
+
+- Some variables may be more available from countries with the resources to collect
+    - Cancer rates, nursing and midwife densities, and mammography rates may be collected in more developed nations
+    - Political climate in some regions may reduce the amount of data reported to the WHO
+
+- different measurement/data collection method    
+

@@ -1,0 +1,552 @@
+---
+title: "FinalProject_TheStatian"
+author: "The Statian"
+date: "11/29/2015"
+output: html_document
+runtime: shiny
+---
+
+## Research Question:
+#### What are the correlations between economic status of countries and the health indicators of countries? And how are they correlated?
+
+## Significance of the topic: why do we choose this dataset?
+
+## Source of Data:
+WHO Dataset compiled by David Reshef and Yakir Reshef, as part of their project on maximal
+information-based nonparametric exploration (MINE) statistics. The dataset includes social,
+economic, health, and political indicators from the World Health Organization and GapMinder. 
+The year this data reported is 2009.
+
+URL:http://www.exploredata.net/Downloads/WHO-Data-Set
+
+###Ground work
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(GGally)
+```
+
+
+###Load the dataset
+```{r, message=FALSE}
+dataset <- read.csv("WHO.csv", stringsAsFactors = FALSE, na.strings = c(NA, NULL))
+```
+
+
+### 1. Overview: differences in economic growth around the world
+
+As of 1 July 2013, the World Bank income classifications by Gross National Income (GNI) per capita are as follows:
+
+Low income: $1,035 or less
+
+Lower middle income: $1,036 to $4,085
+
+Upper middle income: $4,086 to $12,615
+
+High income: $12,616 or more
+
+Firstly, we will group countries according to GNI per capita into the above 4 groups, and create a
+visualization of the number of countries that falls in each of the category. This is to
+give an overview at the beginning to show the differences in economic status around the world now.
+
+Check the type of GNI_per_capita:
+```{r}
+class(dataset$GNI_per_capita)
+#dataset$GNI_per_capita <- as.numeric(as.character(dataset$GNI_per_capita))
+```
+
+The class is integer, which is the right type ready to use. Now we can start to group the
+countries. According to the categories we mentioned earlier, we split the countries into 5 groups:
+low income, lower middle income, upper middle income, high income and NA.
+
+
+```{r}
+#findInterval(dataset$GNI_per_capita, c(1035, 4085, 12615))
+dataset$income_group <- cut(dataset$GNI_per_capita, 
+                       breaks = c(-Inf, 1035, 4085, 12615, Inf), 
+                       labels = c("LOW INCOME", "LOWER MIDDLE INCOME", "UPPER MIDDLE INCOME", "HIGH INCOME"), 
+                       right = FALSE)
+
+```
+
+Now let us check and see the groups:
+
+```{r}
+dataset %>%
+  group_by(income_group) %>%
+  summarise(count = n())
+```
+
+We can now plot a graph for this:
+
+```{r}
+incomeplot <- ggplot(dataset, aes(x = income_group)) + 
+  geom_histogram()
+incomeplot + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+To dive further, we can also add "Continent" factor in to see the differences across continents:
+
+First of all check and make sure Continent is a factor string.
+```{r}
+class(dataset$Continent)
+dataset$Continent <- as.factor(dataset$Continent)
+class(dataset$Continent)
+```
+
+
+However, we realized that the continents are represented by numbers instead of the actual
+continent name, and it is not convenient for us to visualize and interpret. Therefore we are
+recoding them back to their actual names.
+
+```{r}
+dataset <- dataset %>%
+  mutate(Continent = str_replace(Continent, "1", "Eastern Mediterranean Region")) %>%
+  mutate(Continent = str_replace(Continent, "2", "European Region")) %>%
+  mutate(Continent = str_replace(Continent, "3", "African Region")) %>%
+  mutate(Continent = str_replace(Continent, "4", "North American Region")) %>%
+  mutate(Continent = str_replace(Continent, "5", "South American Region")) %>%
+  mutate(Continent = str_replace(Continent, "6", "Western Pacific Region")) %>%
+  mutate(Continent = str_replace(Continent, "7", "South-East Asia Region"))
+
+```
+
+
+Then we will color the bar plots by continent:
+
+```{r}
+plot <- ggplot(dataset, aes(x = income_group, fill = Continent)) +
+  geom_bar(position = "dodge") +
+  ggtitle("Income group vs. Continent")
+plot + theme(axis.text.x=element_text(angle = 45, hjust = 1))
+```
+
+
+And in the following sections we will explore factors associated to this difference.
+Since this dataset is reported by the World Health Organization, we will specifically focus on the
+relationship between health indicators and economic status of countries.
+
+
+### 2. Explore the relationship between economic variables and health variables
+
+Since health is very broad term, we split the health variables into different groups and made a seperate interactive graph for each.
+
+The first interactive focuses on the relationship between the economic conditions of the country and government expenditure on health.
+
+The second interactive focuses on the relationship between the economic conditions of the country and prevalence of preventative treatment (contraceptives, immunizations, etc).
+
+The third interactive focuses on the relationship between the economic conditions of the country and quality of health treatment for children.
+
+The fourth interactive focuses on the relationship between the economic conditions of the country and disease contraction and mortality rates.
+
+The fifth interactive focuses on the relationship between the economic conditions of the country and density of health workers.
+
+```{r}
+shinyUI(fluidPage(
+  titlePanel("The Impact of Economic Status on Health of Countries"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("econ1", 
+                  "Economic status",
+                  choices = c("GNI_per_capita",
+                              "Population_living_below_the_poverty_line")),
+      
+      selectInput("govtval", 
+                  "Government Expenditure on Health",
+                  choices = c("General_government_expenditure_on_health_as_percentage_of_total_expenditure_on_health",
+                              "General_government_expenditure_on_health_as_percentage_of_total_government_expenditure",
+                              "Per_capita_government_expenditure_on_health",
+                              "Per_capita_government_expenditure_on_health_at_average_exchange_rate_US_dollar")),
+      
+      hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),
+      
+      selectInput("econ2", 
+                  "Economic status",
+                  choices = c("GNI_per_capita",
+                              "Population_living_below_the_poverty_line")),
+      
+      selectInput("preventative", 
+                  "Prevalence of Preventative Treatment",
+                  choices = c("Contraceptive_prevalence",
+                              "Women_who_have_had_mammography",
+                              "Women_who_have_had_PAP_smear",
+                              "Oneyearolds_immunized_with_three_doses_of_DTP3",
+                              "Oneyearolds_immunized_with_three_doses_of_HepB3",
+                              "Oneyearolds_immunized_with_three_doses_of_Hib3")),
+      
+      hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),
+      
+      selectInput("econ3", 
+                  "Economic status",
+                  choices = c("GNI_per_capita",
+                              "Population_living_below_the_poverty_line")),
+      
+      selectInput("childhealth", 
+                  "Quality of Health Treatment for Children",
+                  choices = c("Children_aged_6_to_59_months_who_received_vitamin_A_supplementation",
+                              "Children_aged_5_years_with_ARI_symptoms_taken_to_facility",
+                              "Under_five_mortality_rate",
+                              "Infant_mortality_rate_per_1000_live_births_both_sexes",
+                              "Births_attended_by_skilled_health_personnel",
+                              "Children_aged_lt_5_years_sleeping_under_insecticidetreated_nets",
+                              "Children_aged_lt_5_years_who_received_any_antimalarial_treatment_for_fever")),
+      
+      hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),
+      
+      selectInput("econ4", 
+                  "Economic status",
+                  choices = c("GNI_per_capita",
+                              "Population_living_below_the_poverty_line")),
+      
+      selectInput("diseases", 
+                  "Disease and Disease Mortality Rates",
+                  choices = c("All_forms_of_TB_new_cases_per_100_000_estimated",
+                              "Prevalence_of_tuberculosis_per_100000_population",
+                              "Colon_and_Rectum_cancer_deaths_per_100_000_women",
+                              "Colon_and_Rectum_cancer_deaths_per_100_000_men",
+                              "Colon_and_Rectum_cancer_new_cases_per_100_000_men",
+                              "Colon_and_Rectum_cancer_new_cases_per_100_000_women",
+                              "Stomach_cancer_new_cases_per_100_000_men",
+                              "Stomach_cancer_new_cases_per_100_000_women",
+                              "Stomach_cancer_deaths_per_100_000_men",
+                              "Stomach_cancer_deaths_per_100_000_women",
+                              "Liver_cancer_new_cases_per_100_000_men",
+                              "Liver_cancer_new_cases_per_100_000_women",
+                              "Liver_cancer_deaths_per_100_000_men",
+                              "Liver_cancer_deaths_per_100_000_women",
+                              "Prevalence_of_HIV_among_adults_aged_gt15_years_per_100000_population")),
+      
+      hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),hr(),
+      
+      selectInput("econ5", 
+                  "Economic status",
+                  choices = c("GNI_per_capita",
+                              "Population_living_below_the_poverty_line")),
+      
+      selectInput("healthworkers", 
+                  "Density of Health Workers",
+                  choices = c("Community_and_traditional_health_workers_density_per_10000_population",
+                              "Laboratory_health_workers_density_per_10000_population",
+                              "Number_of_community_and_traditional_health_workers",
+                              "Number_of_dentistry_personnel",
+                              "Number_of_other_health_service_providers",
+                              "Number_of_physicians",
+                              "Nursing_and_midwifery_personnel_density_per_10000_population",
+                              "Other_health_service_providers_density_per_10000_population",
+                              "Pharmaceutical_personnel_density_per_10000_population"))    
+      
+    ),
+    
+    mainPanel(
+      
+      plotOutput('govtvalPlot'),
+      
+      hr(),
+      
+      plotOutput("preventativePlot"),
+      
+      hr(),
+      
+      plotOutput("childhealthPlot"),
+      
+      hr(),
+      
+      plotOutput("diseasesPlot"),
+      
+      hr(),
+      
+      plotOutput("healthworkersPlot")
+    )
+    
+  )))
+
+output$govtvalPlot <- renderPlot({
+  
+  ggplot(data = dataset, aes_string((x = input$econ1), y = input$govtval)) +
+    geom_point() +
+    ggtitle("Economic Status vs. Government Expenditure on Health")
+})
+
+output$preventativePlot <- renderPlot({
+  
+  ggplot(data = dataset, aes_string((x = input$econ2), y = input$preventative)) +
+    geom_point() +
+    ggtitle("Economic Status vs. Prevalence of Preventative Treatment")
+})
+
+output$childhealthPlot <- renderPlot({
+  
+  ggplot(data = dataset, aes_string((x = input$econ3), y = input$childhealth)) +
+    geom_point() +
+    ggtitle("Economic Status vs. Quality of Health Treatment for Children")
+})
+
+output$diseasesPlot <- renderPlot({
+  
+  ggplot(data = dataset, aes_string((x = input$econ4), y = input$diseases)) +
+    geom_point() +
+    ggtitle("Economic Status vs. Disease Contraction and Mortality Rates")
+})
+
+output$healthworkersPlot <- renderPlot({
+  
+  ggplot(data = dataset, aes_string((x = input$econ5), y = input$healthworkers)) +
+    geom_point() +
+    ggtitle("Economic Status vs. Density of Health Workers")
+})
+
+```
+
+### 3. Constructing model
+
+Based on the exploration in part 2, we will now use forward elimination to construct a model that
+can best explain the variablity in GNI per capita of the countries around the world, based on the
+r-squared value.
+We will exclude some variables such as "Population living below the poverty line" since this is
+sort of considered cheating in building a model in this case.
+
+#### GNI per capita vs. Government Expenditure on Health
+```{r}
+gni_govexpperheath <- lm(GNI_per_capita ~ General_government_expenditure_on_health_as_percentage_of_total_expenditure_on_health, data = dataset)
+gni_govexppertot <- lm(GNI_per_capita ~ General_government_expenditure_on_health_as_percentage_of_total_government_expenditure, data = dataset)
+gni_govexppercap <- lm(GNI_per_capita ~ Per_capita_government_expenditure_on_health, data = dataset)
+gni_govexpexhrate <- lm(GNI_per_capita ~ Per_capita_government_expenditure_on_health_at_average_exchange_rate_US_dollar, data = dataset)
+summary(gni_govexpperheath)$r.squared
+summary(gni_govexppertot)$r.squared
+summary(gni_govexppercap)$r.squared
+summary(gni_govexpexhrate)$r.squared
+```
+
+Since the four variables are likely colinear, a full model would misrepresent the data. Therefore, the variable which explains the variation in GNI per-capita the best is the Per-capita government expenditure on health, which accounts for 73.37% of the variation according to the $R^2$ value.
+
+#### GNI vs. Preventative Treatment
+```{r}
+gni_mamm <- lm(GNI_per_capita ~ Women_who_have_had_mammography, data = dataset)
+gni_papsm <- lm(GNI_per_capita ~ Women_who_have_had_PAP_smear, data = dataset)
+gni_contprev <- lm(GNI_per_capita ~ Contraceptive_prevalence, data = dataset)
+gni_DTP3 <- lm(GNI_per_capita ~ Oneyearolds_immunized_with_three_doses_of_DTP3, data = dataset)
+gni_HepB3 <- lm(GNI_per_capita ~ Oneyearolds_immunized_with_three_doses_of_HepB3, data = dataset)
+gni_Hib3 <- lm(GNI_per_capita ~ Oneyearolds_immunized_with_three_doses_of_Hib3, data = dataset)
+summary(gni_mamm)$r.squared
+summary(gni_papsm)$r.squared
+summary(gni_contprev)$r.squared
+summary(gni_DTP3)$r.squared
+summary(gni_HepB3)$r.squared
+summary(gni_Hib3)$r.squared
+```
+
+Since the four variables are likely colinear, a full model would misrepresent the data. Therefore, the variable which explains the variation in GNI per-capita the best in context of preventative treatments is the percentave of women who have had a mammography, which accounts for 66.84% of the variation according to the $R^2$ value.
+
+#### GNI vs. Quality of Health Treatment for Children
+```{r}
+gni_childvitA <- lm(GNI_per_capita ~ Children_aged_6_to_59_months_who_received_vitamin_A_supplementation, data = dataset)
+gni_ARIsymp <- lm(GNI_per_capita ~ Children_aged_5_years_with_ARI_symptoms_taken_to_facility, data = dataset)
+gni_un5mort <- lm(GNI_per_capita ~ Under_five_mortality_rate, data = dataset)
+gni_infmort1000 <- lm(GNI_per_capita ~ Infant_mortality_rate_per_1000_live_births_both_sexes, data = dataset)
+gni_skilledbirth <- lm(GNI_per_capita ~ Births_attended_by_skilled_health_personnel, data = dataset)
+gni_insectnet <- lm(GNI_per_capita ~ Children_aged_lt_5_years_sleeping_under_insecticidetreated_nets, data = dataset)
+gni_childmalaria <- lm(GNI_per_capita ~ Children_aged_lt_5_years_who_received_any_antimalarial_treatment_for_fever, data = dataset)
+summary(gni_childvitA)$r.squared
+summary(gni_ARIsymp)$r.squared
+summary(gni_un5mort)$r.squared
+summary(gni_infmort1000)$r.squared
+summary(gni_skilledbirth)$r.squared
+summary(gni_insectnet)$r.squared
+summary(gni_childmalaria)$r.squared
+```
+
+Since the seven variables are likely colinear, a full model would misrepresent the data. Therefore, the variable which explains the variation in GNI per-capita the best in context of preventative treatments is the infant mortality rate per 1000 live births, which accounts for 43.73% of the variation according to the $R^2$ value.
+
+#### GNI per capita vs. Disease and Disease Mortality Rates
+```{r}
+gni_alltbnewcases <- lm(GNI_per_capita ~ All_forms_of_TB_new_cases_per_100_000_estimated , data = dataset)
+
+gni_prevalenceoftb <- lm(GNI_per_capita ~ Prevalence_of_tuberculosis_per_100000_population, data = dataset)
+
+gni_colorectcancerdeathwomen <- lm(GNI_per_capita ~ Colon_and_Rectum_cancer_deaths_per_100_000_women, data = dataset)
+
+gni_colorectcancerdeathmen <- lm(GNI_per_capita ~ Colon_and_Rectum_cancer_deaths_per_100_000_men, data = dataset)
+
+gni_colorectcancernewmen <- lm(GNI_per_capita ~ Colon_and_Rectum_cancer_new_cases_per_100_000_men, data = dataset)
+
+gni_colorectcancernewwomen <- lm(GNI_per_capita ~ Colon_and_Rectum_cancer_new_cases_per_100_000_women, data = dataset)
+
+gni_stomcancernewmen <- lm(GNI_per_capita ~ Stomach_cancer_new_cases_per_100_000_men, data = dataset)
+
+gni_stomcancernewwomen <- lm(GNI_per_capita ~ Stomach_cancer_new_cases_per_100_000_women, data = dataset)
+
+gni_stomcancerdeathmen <- lm(GNI_per_capita ~ Stomach_cancer_deaths_per_100_000_men, data = dataset)
+
+gni_stomcancerdeathwomen <- lm(GNI_per_capita ~ Stomach_cancer_deaths_per_100_000_women, data = dataset)
+
+gni_livcancernewmen <- lm(GNI_per_capita ~ Liver_cancer_new_cases_per_100_000_men, data = dataset)
+
+gni_livcancernewwomen <- lm(GNI_per_capita ~ Liver_cancer_new_cases_per_100_000_women, data = dataset)
+
+gni_livcancerdeathmen <- lm(GNI_per_capita ~ Liver_cancer_deaths_per_100_000_men, data = dataset)
+
+gni_livcancerdeathwomen <- lm(GNI_per_capita ~ Liver_cancer_deaths_per_100_000_women, data = dataset)
+
+gni_prevalenceofhiv <- lm(GNI_per_capita ~ Prevalence_of_HIV_among_adults_aged_gt15_years_per_100000_population, data = dataset)
+
+summary(gni_alltbnewcases)$r.squared
+summary(gni_prevalenceoftb)$r.squared
+summary(gni_colorectcancerdeathwomen)$r.squared
+summary(gni_colorectcancerdeathmen)$r.squared
+summary(gni_colorectcancernewmen)$r.squared
+summary(gni_colorectcancernewwomen)$r.squared
+summary(gni_stomcancernewmen)$r.squared
+summary(gni_stomcancernewwomen)$r.squared
+summary(gni_stomcancerdeathmen)$r.squared
+summary(gni_stomcancerdeathwomen)$r.squared
+summary(gni_livcancernewmen)$r.squared
+summary(gni_livcancernewwomen)$r.squared
+summary(gni_livcancerdeathmen)$r.squared
+summary(gni_livcancerdeathwomen)$r.squared
+summary(gni_prevalenceofhiv)$r.squared
+```
+
+Since the fourteen variables are likely colinear, a full model would misrepresent the data. Therefore, the variable which explains the variation in GNI per-capita the best in context of preventative treatments is the Colon and Rectal Cancer new cases per 100,000 women, which accounts for 58.33% of the variation according to the $R^2$ value.
+
+#### GNI per capita vs. Density of Health Workers
+```{r}
+gni_comtradhealthworkerdensity <- lm(GNI_per_capita ~ Community_and_traditional_health_workers_density_per_10000_population , data = dataset)
+
+gni_labworkerdensity <- lm(GNI_per_capita ~ Laboratory_health_workers_density_per_10000_population, data = dataset)
+
+gni_comtradhealthworkernumber <- lm(GNI_per_capita ~ Number_of_community_and_traditional_health_workers, data = dataset)
+
+gni_dentistrynumber <- lm(GNI_per_capita ~ Number_of_dentistry_personnel, data = dataset)
+
+gni_otherprovidernumber <- lm(GNI_per_capita ~ Number_of_other_health_service_providers, data = dataset)
+
+gni_physiciannumber <- lm(GNI_per_capita ~ Number_of_physicians, data = dataset)
+
+gni_nursmidwifedensity <- lm(GNI_per_capita ~ Nursing_and_midwifery_personnel_density_per_10000_population, data = dataset)
+
+gni_pharmdensity <- lm(GNI_per_capita ~ Pharmaceutical_personnel_density_per_10000_population, data = dataset)
+
+summary(gni_comtradhealthworkerdensity)$r.squared
+summary(gni_labworkerdensity)$r.squared
+summary(gni_comtradhealthworkernumber)$r.squared
+summary(gni_dentistrynumber)$r.squared
+summary(gni_otherprovidernumber)$r.squared
+summary(gni_physiciannumber)$r.squared
+summary(gni_nursmidwifedensity)$r.squared
+summary(gni_pharmdensity)$r.squared
+```
+
+Since the eight variables are likely colinear, a full model would misrepresent the data. Therefore, the variable which explains the variation in GNI per-capita the best in context of preventative treatments is Nurse and Midwife density per 10,000 population, which accounts for 51.74% of the variation according to the $R^2$ value.
+
+####Exploration of variables in each section with highest $R^2$ value
+We will now examine the variables within each section and construct a linear model for each of them.
+
+```{r}
+summary(gni_govexppercap)
+```
+Therefore:
+$\widehat{GNIpercapita} = 4224.335 +$ $12.597\widehat{PerCapitaGovernmentExpenditureOnHealth}$
+
+This means that an increase of 1 unit of per capita government expenditure for health will result in an increase of 12.597 units of GNI per capita. However, this linear relationship probably will break down at higher levels of per capita government expenditure for health. Assuming that higher government expenditure on health translates to a healthier and more productive work force which in turn increases GNI, there is only so healthy one country's workforce can get. Once the workforce is at its "maximum" level of health, extra expenditure on health will not increase GNI anymore.
+
+```{r}
+summary(gni_mamm)
+```
+Therefore:
+$\widehat{GNIpercapita} = 3386.05 +$ $407.86\widehat{WomenWhoHaveHadMammography}$
+
+This means that an increase of 1% of woman who have had mammography will result in an increase of 12.597 units of GNI per capita.
+
+
+```{r}
+summary(gni_infmort1000)
+```
+Therefore:
+$\widehat{GNIpercapita} = -41501.61 +$ $783.99\widehat{InfantMortalityRatePer1000LiveBirthsBothSexes}$
+
+This means that an increase of 1 to infant mortality rate per 1000 live births will result in an increase of 783.99 units of GNI per capita. It makes no sense because a higher infant mortality rate implies worse health condition in the specific country, since more infants die. The y-intercept in this case makes no sense because it is less than zero, implying that when infant mortality rate is zero, GNI per capita will be negative. The linear model is probably not a good model in this case.
+
+We therefore proceeded to use the variable with the second-highest $R^2$ value in the section.
+
+```{r}
+summary(gni_un5mort)
+```
+
+Therefore:
+$\widehat{GNIpercapita} = 18160.8 +$ 
+$-122.48\widehat{under5mortalityrates}$
+
+
+This means that an increase in 1 of the under 5 mortality rate will resuly in a decrease of 122.48 units of GNI. This makes much more sense in context of the data.
+
+
+```{r}
+summary(gni_colorectcancernewwomen)
+```
+Therefore:
+
+$\widehat{GNIpercapita} = -467.96 +$ $1005.17\widehat{ColonAndRectumCancerNewCasesPer100000Women}$
+
+
+This means that an increase in 1 new case of colon and rectum cancer per 100,000 women will result in an increase of 1005.17 units of GNI per capita. The y-intercept in this case makes no sense because it is less than zero, implying that when number of new cases of colon and rectum cancer among women is zero, GNI per capita wil be negative. 
+
+We thus also used the variable in the section with the second-highest $R^2$ value
+
+```{r}
+summary(gni_colorectcancernewmen)
+```
+Therefore:
+$\widehat{GNIpercapita} = 1149.16 +$ $640.17\widehat{Colon_and_Rectum_cancer_new_cases_per_100_000_men}$
+
+This means that an increase in 1 new case of colon or rectum cancer in 100,000 neb will result in an increase of 640.17 units of GNI per capita. 
+
+```{r}
+summary(gni_nursmidwifedensity)
+```
+Therefore:
+$\widehat{GNIpercapita} = 1837.37 +$ $251.19\widehat{NursingAndMidwiferyPersonnelDensityPer10000Population}$
+
+This means that an increase in 1 nursing or midwife personnel per 10000 population will result in an increase of 251.19 units of GNI per capita.
+
+
+The y-intercept of the 3 models with positive y-intercepts, namely per capita government expenditure on health, % of women who have had mammogramy, and nursing and midwifery personnel density per 10000 populations, are all large in magnitude compared to the gradient of their respective models. This also inplies that besides health factors, there are also other factors which affect the GNI per capita of a country (e.g. economic circumstance, social factors).
+
+#### Constructing a Full Model of the variables
+
+We took the variable with the highest $R^2$ value of each section and construct a full model:
+
+```{r}
+full_model_gni_health <- lm(GNI_per_capita ~ Per_capita_government_expenditure_on_health + Women_who_have_had_mammography + Infant_mortality_rate_per_1000_live_births_both_sexes + Colon_and_Rectum_cancer_new_cases_per_100_000_women + Nursing_and_midwifery_personnel_density_per_10000_population, data = dataset)
+AIC(full_model_gni_health)
+full_model_gni_health$call
+```
+
+The AIC for the full model is 1386.88
+
+```{r}
+final_model_gni_health <- step(full_model_gni_health, direction = "forward")
+AIC(final_model_gni_health)
+final_model_gni_health$call
+```
+
+The AIC for the final model has not changed from that of the original full model, so no variables listed have been dropped.
+
+```{r}
+final_model_gni_health
+```
+
+The formula for the final full model which best predicts the variance in GNI as a result of overall population health is:
+
+$\widehat{GNIpercapita} = -11444.022 +$ $10.017\widehat{PerCapitaGovernmentExpenditureOnHealth} -$ $3.457\widehat{WomenWhoHaveHadMammography} +$ $230.872\widehat{InfantMortalityRatePer1000LiveBirthsBothSexes} -$ $23.755\widehat{ColonAndRectumCancerNewCasesPer100000Women} +$ $35.033\widehat{NursingAndMidwiferyPersonnelDensityPer10000Population}$
+
+### 4. Implications of our findings
+Since there is a positive relationship between government expenditure on health and economic growth, the government should increase expenditure on health in order to boost economic growth. The government, however, should be mindful that expenditure is utilized equitably so that no part of the population is left out of the policies. Otherwise it will only be part of the population benefits from better health care while others remain suffering.
+
+
+However, we should also be aware that these implications are only based on the purpose of improving economic performance. In real life it is more complicated because of social issues. For example, even if we find a positive relationship between infant mortality rate and economic growth, it is not moral nor practical in terms of policy-making for governments to start culling babies. Another example is that, in our model, prevalence of HIV counts little towards economic growth of a country and therefore is not given the top priority, but it is a contagious disease and HIV patients suffer very much, so in reality, governments pay much more attention on HIV prevention and treatments. 
+
+
+### 5. Limitations, future improvements and further explorations
+We can include more indicators for economic status in the future, such as people living under poverty line or household income. Also, we constructed models on GNI per capita based on the purpose of boosting economic growth, but the goal of development of a country is very diverse. Based on different purpose or priority identified in real life, we can construct models for different factors. The data we have is not a random sample of countries, nor a population of all countries (with a lot of NAs). Hence we can neither do bootstrapping or hypothesis test to estimate the whole population of countries, nor obtain a comprehensive census on all variables of all countries in the world. we should also keep in mind that this kind of census across countries around the world may become tricky when it comes to data collection processes. For example, much data were obtained by self-report of the countries, and these countries may have difference ways of defining, counting and calculating the variables, for which we have no control with.
+
